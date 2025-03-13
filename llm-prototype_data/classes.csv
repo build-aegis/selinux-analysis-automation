@@ -1,5 +1,0 @@
-name,permissions,description
-dir,"read,write,execute,search,append,manage","Directory operations"
-file,"read,write,execute,getattr,setattr,append","File operations"
-socket,"read,write,connect,bind,listen,accept","Socket operations"
-process,"fork,signal,transition,getsched,setsched","Process operations"
