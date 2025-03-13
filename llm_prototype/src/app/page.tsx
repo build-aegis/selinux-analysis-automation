@@ -3,46 +3,45 @@
 import { useState } from 'react';
 import { QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
 
-export default function Home() {
+export default function HomePage() {
   const [query, setQuery] = useState('');
-  const [cypherQuery, setCypherQuery] = useState('');
-  const [results, setResults] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState(null);
   const [error, setError] = useState('');
   const [showHelp, setShowHelp] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!query.trim()) {
       setError('Please enter a query');
       return;
     }
-    
-    setIsLoading(true);
+
+    setLoading(true);
     setError('');
-    
+    setResults(null);
+
     try {
-      const response = await fetch('/api/query', {
+      const response = await fetch('/api', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ query }),
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to process query');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to process query');
       }
-      
+
       const data = await response.json();
-      setCypherQuery(data.cypher_query);
-      setResults(data.results || []);
+      setResults(data);
     } catch (err) {
-      console.error('Error:', err);
-      setError('An error occurred while processing your request');
+      setError(err.message);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -97,9 +96,9 @@ export default function Home() {
                   <button
                     type="submit"
                     className="px-6 py-2 bg-[#00ff00]/10 hover:bg-[#00ff00]/20 border border-[#00ff00]/30 rounded font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-[0_0_10px_rgba(0,255,0,0.1)]"
-                    disabled={isLoading}
+                    disabled={loading}
                   >
-                    {isLoading ? (
+                    {loading ? (
                       <>
                         <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
@@ -119,29 +118,59 @@ export default function Home() {
               )}
             </form>
 
-            <div className="bg-black/80 border border-[#00ff00]/30 rounded p-6 shadow-[0_0_15px_rgba(0,255,0,0.1)]">
-              <h2 className="text-xl font-semibold mb-4">&gt; Results</h2>
-              {results.length > 0 ? (
-                <div className="space-y-4">
-                  {results.map((result, idx) => (
-                    <div key={idx} className="bg-black/80 p-4 rounded border border-[#00ff00]/30">
-                      <pre className="text-sm text-[#00ff00]/90 overflow-x-auto">
-                        {JSON.stringify(result, null, 2)}
-                      </pre>
+            {results && (
+              <>
+                <div className="bg-black/80 border border-[#00ff00]/30 rounded p-6 shadow-[0_0_15px_rgba(0,255,0,0.1)]">
+                  <h2 className="text-xl font-semibold mb-4">&gt; Query Results</h2>
+                  {results.results && results.results.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full bg-black/60 border border-[#00ff00]/30">
+                        <thead>
+                          <tr className="bg-[#00ff00]/10">
+                            {Object.keys(results.results[0]).map((key) => (
+                              <th key={key} className="py-2 px-4 border-b border-[#00ff00]/30 text-left">
+                                {key}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {results.results.map((item, idx) => (
+                            <tr key={idx} className="border-b border-[#00ff00]/30">
+                              {Object.values(item).map((value, valueIdx) => (
+                                <td key={valueIdx} className="py-2 px-4 text-[#00ff00]/90">
+                                  {Array.isArray(value) ? value.join(', ') : value}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  ))}
+                  ) : (
+                    <p className="text-[#00ff00]/50">No results found</p>
+                  )}
                 </div>
-              ) : (
-                <p className="text-[#00ff00]/50">No results available...</p>
-              )}
-            </div>
+
+                <div className="bg-black/80 border border-[#00ff00]/30 rounded p-6 shadow-[0_0_15px_rgba(0,255,0,0.1)]">
+                  <h2 className="text-xl font-semibold mb-4">&gt; Analysis</h2>
+                  <div className="text-[#00ff00]/90">
+                    {results.interpretation && results.interpretation.split('\n\n').map((paragraph, idx) => (
+                      <p key={idx} className="mb-4">
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="bg-black/80 border border-[#00ff00]/30 rounded p-6 h-fit sticky top-24 shadow-[0_0_15px_rgba(0,255,0,0.1)]">
             <h2 className="text-xl font-semibold mb-4">&gt; Generated Query</h2>
             <div className="bg-black/80 p-4 rounded border border-[#00ff00]/30">
               <pre className="text-sm text-[#00ff00]/90 overflow-x-auto whitespace-pre-wrap">
-                {cypherQuery || 'Waiting for input...'}
+                {results ? results.cypher_query : 'Waiting for input...'}
               </pre>
             </div>
           </div>
