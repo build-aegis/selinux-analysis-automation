@@ -1,0 +1,12 @@
+name,type,domain,attributes
+user_t,process,user_t,"domain,user_domain"
+sysadm_t,process,sysadm_t,"domain,admin_domain"
+httpd_t,process,httpd_t,"domain,web_server_domain"
+postgresql_t,process,postgresql_t,"domain,database_domain"
+ftpd_t,process,ftpd_t,"domain,ftp_server_domain"
+finance_app_t,process,finance_app_t,"domain,finance_domain"
+audit_t,process,audit_t,"domain,auditing_domain"
+security_t,process,security_t,"domain,security_domain"
+backup_t,process,backup_t,"domain,backup_domain"
+payment_proc_t,process,payment_proc_t,"domain,payment_domain"
+customer_data_t,process,customer_data_t,"domain,customer_domain"
