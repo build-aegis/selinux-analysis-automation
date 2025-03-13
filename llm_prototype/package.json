@@ -15,8 +15,9 @@
     "@langchain/openai": "^0.4.4",
     "csv-parse": "^5.6.0",
     "dotenv": "^16.4.7",
+    "@heroicons/react": "^2.2.0",
     "neo4j-driver": "^5.28.1",
-    "next": "15.2.1",
+    "next": "^15.2.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
