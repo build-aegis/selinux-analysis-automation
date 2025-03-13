@@ -9,6 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.0",
+    "@langchain/core": "^0.3.42",
+    "@langchain/google-genai": "^0.1.11",
+    "@langchain/openai": "^0.4.4",
+    "csv-parse": "^5.6.0",
+    "dotenv": "^16.4.7",
     "neo4j-driver": "^5.28.1",
     "next": "15.2.1",
     "react": "^19.0.0",
