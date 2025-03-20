@@ -1,4 +1,4 @@
-FROM neo4j:latest
+FROM docker.io/neo4j:latest
 
 ENV NEO4J_AUTH=neo4j/selinux123
 ENV NEO4J_dbms_memory_pagecache_size=1G
