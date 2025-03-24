@@ -1,8 +1,5 @@
 import { Driver, Session, RecordShape, auth, driver as createDriver } from 'neo4j-driver';
 
-/**
- * Neo4j connection utility for TypeScript/Next.js applications
- */
 export class Neo4jConnection {
   private uri: string;
   private user: string;
@@ -13,6 +10,8 @@ export class Neo4jConnection {
     this.uri = process.env.NEO4J_URI || 'bolt://localhost:7687';
     this.user = process.env.NEO4J_USER || 'neo4j';
     this.password = process.env.NEO4J_PASSWORD || 'selinux123';
+    
+    console.log(`Neo4j connection initialized with URI: ${this.uri}`);
   }
 
   /**
@@ -20,6 +19,7 @@ export class Neo4jConnection {
    */
   public async connect(): Promise<void> {
     try {
+      console.log(`Connecting to Neo4j at ${this.uri}...`);
       this.driver = createDriver(
         this.uri,
         auth.basic(this.user, this.password)
@@ -53,6 +53,7 @@ export class Neo4jConnection {
     params: Record<string, any> = {}
   ): Promise<T[]> {
     if (!this.driver) {
+      console.log("No active connection, attempting to connect...");
       await this.connect();
     }
 
@@ -62,8 +63,14 @@ export class Neo4jConnection {
 
     let session: Session | null = null;
     try {
+      console.log(`Executing query: ${query}`);
+      console.log(`With params: ${JSON.stringify(params)}`);
+      
       session = this.driver.session();
       const result = await session.run(query, params);
+      
+      console.log(`Query executed successfully, processing ${result.records.length} records`);
+      
       return result.records.map(record => {
         const obj: any = {};
         record.keys.forEach(key => {
@@ -86,9 +93,9 @@ export class Neo4jConnection {
    */
   public async createConstraints(): Promise<void> {
     const constraints = [
-      "CREATE CONSTRAINT subject_name IF NOT EXISTS FOR (s:Subject) REQUIRE s.name IS UNIQUE",
-      "CREATE CONSTRAINT object_name IF NOT EXISTS FOR (o:Object) REQUIRE o.name IS UNIQUE",
-      "CREATE CONSTRAINT class_name IF NOT EXISTS FOR (c:Class) REQUIRE c.name IS UNIQUE"
+      "CREATE CONSTRAINT IF NOT EXISTS FOR (s:Subject) REQUIRE s.name IS UNIQUE",
+      "CREATE CONSTRAINT IF NOT EXISTS FOR (o:Object) REQUIRE o.name IS UNIQUE",
+      "CREATE CONSTRAINT IF NOT EXISTS FOR (c:Class) REQUIRE c.name IS UNIQUE"
     ];
 
     for (const constraint of constraints) {
@@ -107,9 +114,9 @@ export class Neo4jConnection {
    */
   public async createIndexes(): Promise<void> {
     const indexes = [
-      "CREATE INDEX subject_type IF NOT EXISTS FOR (s:Subject) ON (s.type)",
-      "CREATE INDEX object_type IF NOT EXISTS FOR (o:Object) ON (o.type)",
-      "CREATE INDEX class_type IF NOT EXISTS FOR (c:Class) ON (c.type)"
+      "CREATE INDEX IF NOT EXISTS FOR (s:Subject) ON (s.type)",
+      "CREATE INDEX IF NOT EXISTS FOR (o:Object) ON (o.type)",
+      "CREATE INDEX IF NOT EXISTS FOR (c:Class) ON (c.type)"
     ];
 
     for (const index of indexes) {
