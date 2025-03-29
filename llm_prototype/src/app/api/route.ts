@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
+import { getNeo4jConnection } from '@/lib/neo4j-utils';
 import * as dotenv from 'dotenv';
 
 // Load environment variables
@@ -20,37 +21,44 @@ You are a security analyst specializing in SELinux policies. Your task is to con
 
 The database has the following structure:
 - Nodes with label 'Subject' represent SELinux domains/processes with properties:
-  * name: The name of the domain
-  * type: Usually "process"
-  * domain: The SELinux domain type
-  * attributes: Array of attributes for this subject
+  * name: The name of the domain or type
+  * type: Usually matches the domain name
+  * attributes: Array of type attributes (optional)
 
 - Nodes with label 'Object' represent files, directories, or other resources with properties:
-  * name: The path or identifier of the object
+  * name: The identifier of the object
   * type: The SELinux type of the object
-  * class: The object class (e.g., "dir", "file")
-  * attributes: Array of attributes that might include "sensitive", "financial", etc.
+  * attributes: Array of attributes (optional)
 
-- Relationships with type 'ALLOWS' connect Subjects to Objects with properties:
+- Nodes with label 'Class' represent object classes with properties:
+  * name: The class name (e.g., "file", "dir", "process")
+  * permissions: Array of allowed permissions for this class
+
+- Relationships with type 'ACCESS' connect Subjects to Objects with properties:
   * permissions: Array of permissions granted (e.g., ["read", "write"])
-  * conditions: Array of conditions (if any)
+  * class: The class of the object being accessed
 
 The user is particularly interested in detecting security violations, especially Separation of Duty violations where a single domain has excessive permissions.
 
 Here are some example Cypher queries for common SELinux policy analysis tasks:
 
-1. Find domains with both read and write access to sensitive objects:
-MATCH (s:Subject)-[r:ALLOWS]->(o:Object)
-WHERE 'sensitive' IN o.attributes AND 'read' IN r.permissions AND 'write' IN r.permissions
-RETURN s.name AS Domain, o.name AS SensitiveObject, r.permissions AS Permissions
+1. Find subjects with both read and write access to specific objects:
+MATCH (s:Subject)-[r:ACCESS]->(o:Object)
+WHERE 'read' IN r.permissions AND 'write' IN r.permissions
+RETURN s.name AS SubjectName, o.name AS ObjectName, r.permissions AS Permissions
 ORDER BY s.name;
 
-2. Find domains with access to both financial transactions and audit data:
-MATCH (s:Subject)-[r1:ALLOWS]->(o1:Object), (s)-[r2:ALLOWS]->(o2:Object)
-WHERE 'financial' IN o1.attributes AND 'transactions' IN o1.attributes 
-AND 'financial' IN o2.attributes AND 'audit' IN o2.attributes
-RETURN s.name AS Domain, o1.name AS TransactionObject, r1.permissions AS TransactionPermissions,
-o2.name AS AuditObject, r2.permissions AS AuditPermissions;
+2. Find all objects a specific subject can access:
+MATCH (s:Subject)-[r:ACCESS]->(o:Object)
+WHERE s.name = 'httpd_t'
+RETURN o.name AS ObjectName, o.type AS ObjectType, r.permissions AS Permissions;
+
+3. Find potential Separation of Duty violations:
+MATCH (s:Subject)-[r1:ACCESS]->(o1:Object), (s)-[r2:ACCESS]->(o2:Object)
+WHERE o1.type = 'shadow_t' AND o2.type = 'passwd_t'
+AND ('write' IN r1.permissions OR 'write' IN r2.permissions)
+RETURN s.name AS Domain, o1.name AS Object1, r1.permissions AS Permissions1,
+o2.name AS Object2, r2.permissions AS Permissions2;
 
 User query: {query}
 
@@ -92,45 +100,6 @@ const interpretationChain = interpretationPromptTemplate
   .pipe(llm)
   .pipe(new StringOutputParser());
 
-// Function to get mock query results
-function getMockQueryResults() {
-  return [
-    { Domain: "payment_proc_t", SensitiveObject: "/financial/payments", Permissions: ["read", "write"] },
-    { Domain: "security_t", SensitiveObject: "/var/log/secure", Permissions: ["read", "write"] },
-    { Domain: "customer_data_t", SensitiveObject: "/customer/data", Permissions: ["read", "write"] }
-  ];
-}
-
-// Function to execute Cypher query - Commented out for now
-// In a production environment, you would connect to a Neo4j database
-/*
-async function executeCypherQuery(cypherQuery: string) {
-  const driver = Neo4jDriver.driver(
-    process.env.NEO4J_URI || 'bolt://localhost:7687',
-    Neo4jDriver.auth.basic(
-      process.env.NEO4J_USER || 'neo4j',
-      process.env.NEO4J_PASSWORD || 'password'
-    )
-  );
-  
-  const session = driver.session();
-  try {
-    const result = await session.run(cypherQuery);
-    return result.records.map(record => {
-      const obj: any = {};
-      record.keys.forEach(key => {
-        const value = record.get(key);
-        obj[key] = value;
-      });
-      return obj;
-    });
-  } finally {
-    await session.close();
-    driver.close();
-  }
-}
-*/
-
 export async function POST(request: Request) {
   console.log("POST request received");
   
@@ -156,23 +125,42 @@ export async function POST(request: Request) {
     });
     console.log("Generated Cypher query:", cypherQuery);
     
-    // Mock results instead of executing against Neo4j
-    console.log("Using mock results (Neo4j execution commented out)");
-    const results = getMockQueryResults();
+    // Connect to Neo4j and execute the query
+    const neo4j = getNeo4jConnection();
     
-    // Interpret results using LangChain
-    console.log("Interpreting results...");
-    const interpretation = await interpretationChain.invoke({
-      cypherQuery: cypherQuery,
-      results: JSON.stringify(results),
-    });
-    console.log("Interpretation complete");
-    
-    return NextResponse.json({
-      cypher_query: cypherQuery,
-      results: results,
-      interpretation: interpretation
-    });
+    try {
+      // Connect to Neo4j
+      await neo4j.connect();
+      
+      // Execute the Cypher query
+      console.log("Executing Cypher query...");
+      const results = await neo4j.executeQuery(cypherQuery);
+      console.log(`Query returned ${results.length} results`);
+      
+      // Interpret results using LangChain
+      console.log("Interpreting results...");
+      const interpretation = await interpretationChain.invoke({
+        cypherQuery: cypherQuery,
+        results: JSON.stringify(results),
+      });
+      console.log("Interpretation complete");
+      
+      return NextResponse.json({
+        cypher_query: cypherQuery,
+        results: results,
+        interpretation: interpretation
+      });
+      
+    } catch (dbError) {
+      console.error('Database Error:', dbError);
+      return NextResponse.json(
+        { error: 'Database query failed', details: String(dbError) },
+        { status: 500 }
+      );
+    } finally {
+      // Ensure connection is closed
+      neo4j.close();
+    }
     
   } catch (error) {
     console.error('API Error:', error);
