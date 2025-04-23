@@ -1,4 +1,4 @@
-from neo4j_utils import Neo4jConnection
+from old_neo4j_utils import Neo4jConnection
 
 
 def insert_sample_data(conn: Neo4jConnection):

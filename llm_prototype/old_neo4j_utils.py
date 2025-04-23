@@ -5,12 +5,12 @@ from dotenv import load_dotenv
 
 
 class Neo4jConnection:
-    def __init__(self):
-        load_dotenv()
-        self.uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-        self.user = os.getenv("NEO4J_USER", "neo4j")
-        self.password = os.getenv("NEO4J_PASSWORD", "selinux123")
-        self.driver = None
+    # def __init__(self):
+    #     load_dotenv()
+    #     self.uri = os.getenv("NEO4J_URI", "neo4j+s://bc5d66db.databases.neo4j.io")
+    #     self.user = os.getenv("NEO4J_USER", "neo4j")
+    #     self.password = os.getenv("NEO4J_PASSWORD", "password")
+    #     self.driver = None
 
     def connect(self):
         """Establish connection to Neo4j database"""
