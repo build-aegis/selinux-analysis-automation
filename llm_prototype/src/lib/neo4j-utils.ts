@@ -5,15 +5,14 @@ export class Neo4jConnection {
   private user: string;
   private password: string;
   private driver: Driver | null = null;
-
+  
   constructor() {
-    this.uri = process.env.NEO4J_URI || 'bolt://localhost:7687';
+    this.uri = process.env.NEO4J_URI || '';
     this.user = process.env.NEO4J_USER || 'neo4j';
-    this.password = process.env.NEO4J_PASSWORD || 'selinux123';
-    
+    this.password = process.env.NEO4J_PASSWORD || 'password';
     console.log(`Neo4j connection initialized with URI: ${this.uri}`);
   }
-
+  
   /**
    * Connect to the Neo4j database
    */
@@ -33,7 +32,7 @@ export class Neo4jConnection {
       throw error;
     }
   }
-
+  
   /**
    * Close the Neo4j connection
    */
@@ -44,7 +43,7 @@ export class Neo4jConnection {
       console.log("Neo4j connection closed");
     }
   }
-
+  
   /**
    * Execute a Cypher query and return results
    */
@@ -56,25 +55,42 @@ export class Neo4jConnection {
       console.log("No active connection, attempting to connect...");
       await this.connect();
     }
-
+        
     if (!this.driver) {
       throw new Error("Neo4j driver is not connected");
     }
-
+        
     let session: Session | null = null;
     try {
       console.log(`Executing query: ${query}`);
       console.log(`With params: ${JSON.stringify(params)}`);
-      
+            
       session = this.driver.session();
       const result = await session.run(query, params);
-      
+            
       console.log(`Query executed successfully, processing ${result.records.length} records`);
-      
+            
       return result.records.map(record => {
         const obj: any = {};
         record.keys.forEach(key => {
-          obj[key] = record.get(key);
+          const value = record.get(key);
+          
+          // Process Neo4j node objects
+          if (value && typeof value === 'object') {
+            if ('properties' in value) {
+              // For Neo4j nodes and relationships
+              obj[key] = value.properties;
+            } else if (Array.isArray(value)) {
+              // For arrays
+              obj[key] = value;
+            } else {
+              // For other objects, convert to string
+              obj[key] = JSON.stringify(value);
+            }
+          } else {
+            // For primitive values
+            obj[key] = value;
+          }
         });
         return obj as T;
       });
@@ -87,7 +103,7 @@ export class Neo4jConnection {
       }
     }
   }
-
+  
   /**
    * Create necessary constraints for the SELinux policy graph
    */
@@ -97,7 +113,7 @@ export class Neo4jConnection {
       "CREATE CONSTRAINT IF NOT EXISTS FOR (o:Object) REQUIRE o.name IS UNIQUE",
       "CREATE CONSTRAINT IF NOT EXISTS FOR (c:Class) REQUIRE c.name IS UNIQUE"
     ];
-
+    
     for (const constraint of constraints) {
       try {
         await this.executeQuery(constraint);
@@ -108,7 +124,7 @@ export class Neo4jConnection {
     }
     console.log("All constraints created successfully");
   }
-
+  
   /**
    * Create necessary indexes for the SELinux policy graph
    */
@@ -118,7 +134,7 @@ export class Neo4jConnection {
       "CREATE INDEX IF NOT EXISTS FOR (o:Object) ON (o.type)",
       "CREATE INDEX IF NOT EXISTS FOR (c:Class) ON (c.type)"
     ];
-
+    
     for (const index of indexes) {
       try {
         await this.executeQuery(index);

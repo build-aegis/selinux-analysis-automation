@@ -1,6 +1,6 @@
 import csv
 import os
-from neo4j_utils import Neo4jConnection
+from old_neo4j_utils import Neo4jConnection
 
 # Define paths relative to the script
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # selinux-analysis-automation
